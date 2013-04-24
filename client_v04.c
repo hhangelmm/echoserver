@@ -12,8 +12,7 @@ struct sockaddr_in servaddr;
 int main(int argc,char *argv[])
 {
 	char c;
-	char buf[] = "adsf";
-	int sockfd,n,count= 0;
+	int sockfd,count= 0;
 	int starttime,endtime,ttime;
 	float rps;
 	int bingfanum=1000;
@@ -23,7 +22,7 @@ int main(int argc,char *argv[])
 		))){
 		switch(c){
 			case 'c':
-				bingfanum = (int)optarg;
+				bingfanum = atoi(optarg);
 			case 'h':
 				inet_pton(AF_INET,optarg,&servaddr.sin_addr);
 				break;
@@ -34,7 +33,6 @@ int main(int argc,char *argv[])
 		}
 	}
 
-	sockfd = socket(AF_INET,SOCK_STREAM,0);
 	bzero(&servaddr,sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port= htons(SERV_PORT);
@@ -42,14 +40,15 @@ int main(int argc,char *argv[])
 	int i ;
 	pthread_t tid1[bingfanum];
 	for(i = 0;i<bingfanum;i++){
+		sockfd = socket(AF_INET,SOCK_STREAM,0);
 		pthread_create(&tid1[i],NULL,connectto,(void*)sockfd);
-		printf("\nthread create :%d \n",i);
 	}
 	for(i = 0;i<bingfanum;i++){
 		pthread_join(tid1[i],NULL);
 	}
 	endtime = time(NULL);
 	ttime = difftime(endtime,starttime);
+	count = 1000*bingfanum;
 	rps = (float)count/ttime;
 	printf("\ncount :%d ttime:%d rps:%f\n",count,ttime,rps);
 	return 0;
@@ -60,13 +59,14 @@ void *connectto(void* arg)
 	connect(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
 	str_cli(stdin,sockfd);
 	close(sockfd);
+	return(NULL);
 }
 void str_cli(FILE *fp,int sockfd)
 {
 	long int count = 0;
 	int n;
 	char recvline[MAXLINE];
-	int m=10000;
+	int m=1000;
 	char *buf = "asdf";
 	while((m--)>0){
 	    write(sockfd,buf,strlen(buf));
@@ -75,6 +75,7 @@ void str_cli(FILE *fp,int sockfd)
 			//write(STDOUT_FILENO,recvline,n);
 		}
 	}
-	printf("\ncount :%ld \n",count);
+	printf("\ncount :%ld %d \n",count,sockfd);
+	return;
 }
 

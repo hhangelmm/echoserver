@@ -8,7 +8,6 @@ int main(int argc,char **argv)
 	int i,maxi,maxfd,listenfd,connfd,sockfd;
 	int nready,client[FD_SETSIZE];
 	fd_set rset,allset;
-	ssize_t n;
 	socklen_t clilen;
 	struct sockaddr_in cliaddr,servaddr;
 	char str[INET_ADDRSTRLEN];
