@@ -37,18 +37,19 @@ int main(int argc,char *argv[])
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port= htons(SERV_PORT);
 	starttime = time(NULL);
-	int i ;
+	int i,rtn ;
 	pthread_t tid1[bingfanum];
 	for(i = 0;i<bingfanum;i++){
 		sockfd = socket(AF_INET,SOCK_STREAM,0);
-		pthread_create(&tid1[i],NULL,connectto,(void*)sockfd);
+		if((rtn = pthread_create(&tid1[i],NULL,connectto,(void*)sockfd)))
+			err_quit("pthread error\n");
 	}
 	for(i = 0;i<bingfanum;i++){
 		pthread_join(tid1[i],NULL);
 	}
 	endtime = time(NULL);
 	ttime = difftime(endtime,starttime);
-	count = 1000*bingfanum;
+	count = 10000*bingfanum;
 	rps = (float)count/ttime;
 	printf("\ncount :%d ttime:%d rps:%f\n",count,ttime,rps);
 	return 0;
@@ -66,7 +67,7 @@ void str_cli(FILE *fp,int sockfd)
 	long int count = 0;
 	int n;
 	char recvline[MAXLINE];
-	int m=1000;
+	int m=10000;
 	char *buf = "asdf";
 	while((m--)>0){
 	    write(sockfd,buf,strlen(buf));

@@ -58,7 +58,7 @@ int main(int argc,char **argv)
 			if((sockfd = client[i])<0)
 				continue;
 			if(FD_ISSET(sockfd,&rset)){
-				pthread_create(&tid,NULL,&doit,(void*)connfd);
+				pthread_create(&tid,NULL,&doit,(void*)sockfd);
 				FD_CLR(sockfd,&allset);
 				client[i]=-1;
 				printf("the client has been closed.\n");
