@@ -72,6 +72,7 @@ void do_read(evutil_socket_t fd, short events, void *arg)
 		if (result <= 0)
 			break;
 
+		printf("recv sizeof buf: %d\n", result);
 		for (i=0; i < result; ++i)  {
 			if (state->buffer_used < sizeof(state->buffer))
 				state->buffer[state->buffer_used++] = buf[i];
@@ -98,8 +99,8 @@ void do_write(evutil_socket_t fd, short events, void *arg)
 	struct fd_state *state = arg;
 
 	while (state->n_written < state->write_upto) {
-		ssize_t result = send(fd, state->buffer + state->n_written,
-				state->write_upto - state->n_written, 0);
+		ssize_t result = send(fd, state->buffer + state->n_written,	state->write_upto - state->n_written, 0);
+		printf("send sizeof buf: %d\n", result);
 		if (result < 0) {
 			if (errno == EAGAIN) // XXX use evutil macro
 				return;

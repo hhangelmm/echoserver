@@ -41,7 +41,6 @@ int main(int argc,char *argv[])
 	starttime = time(NULL);
 	for(i = 0;i<bingfanum;i++){
 		sockfd = socket(AF_INET,SOCK_STREAM,0);
-		printf("\n%d",sockfd);
 		if((rtn = pthread_create(&tid1[i],NULL,connectto,(void*)sockfd))){
 			printf("strerror: %s ", strerror(errno)); 
 			printf("pthread error %d\n",i);
@@ -85,7 +84,7 @@ void str_cli(FILE *fp,int sockfd)
 		}
 		if((n = (read(sockfd,recvline,n)))>0){
 			count++;
-			write(STDOUT_FILENO,recvline,n);
+			//write(STDOUT_FILENO,recvline,n);
 		}else
 			perror("read error\n");
 	}

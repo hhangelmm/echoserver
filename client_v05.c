@@ -69,18 +69,15 @@ void free_fd_state(struct fd_state *state)
 void do_write(evutil_socket_t fd, short events, void *arg)
 {
 	struct fd_state *state = arg;
-	char *buf = "adsfa\n";
+	char buf[] = "adsfa\n";
 	ssize_t result;
-	int count = 10;
-	while (count--) {
 		assert(state->read_event);
 		result = send(fd, buf, sizeof(buf), 0);
 		if (result <= 0)
-			break;
+			perror("send:");
 		assert(state->read_event);
-		printf("write buf\n");
+		printf("write buf size:%d\n",result);
 		event_add(state->read_event, NULL);
-	}
 	event_del(state->write_event);
 	return;	
 }
@@ -89,7 +86,6 @@ void do_read(evutil_socket_t fd, short events, void *arg)
 {
 	struct fd_state *state = arg;
 	char buf[1024];
-	while (1) {
 		ssize_t result = recv(fd,buf,sizeof(buf),0);
 		if (result < 0) {
 			if (errno == EAGAIN) // XXX use evutil macro
@@ -98,12 +94,16 @@ void do_read(evutil_socket_t fd, short events, void *arg)
 			return;
 		}
 		assert(result != 0);
-		printf("read buf\n");
-		write(STDOUT_FILENO, buf, result);
-	}
+		printf("read buf size:%d\n",result);
+	//	write(STDOUT_FILENO, buf, result);
 	event_del(state->read_event);
 	return;
 }
+int max(int a, int b)
+{ 
+	return a<b?b:a; 
+} 
+
 
 void do_connect(evutil_socket_t sockfd, short event, void *arg)
 {
@@ -117,7 +117,7 @@ void do_connect(evutil_socket_t sockfd, short event, void *arg)
 		struct fd_state *state;
 		evutil_make_socket_nonblocking(sockfd);
 		state = alloc_fd_state(base, sockfd);
-		assert(state); /*XXX err*/
+		assert(state); 
 		assert(state->write_event);
 		event_add(state->write_event, NULL);
 	}
