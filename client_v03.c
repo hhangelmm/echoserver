@@ -17,12 +17,12 @@ int main(int argc,char *argv[])
 	servaddr.sin_family = AF_INET;
 	inet_pton(AF_INET,"10.227.13.232",&servaddr.sin_addr);
 	servaddr.sin_port= htons(SERV_PORT);
-//	starttime = time(NULL);
+	starttime = time(NULL);
 	connect(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
 	str_cli(stdin,sockfd);
 	close(sockfd);
-//	endtime = time(NULL);
-//	ttime = difftime(endtime,starttime);
+	endtime = time(NULL);
+	ttime = difftime(endtime,starttime);
 //	rps = count/ttime;
 //	printf("rps:%f",rps);
 	return 0;
@@ -129,4 +129,4 @@ char *gf_time(void)
 	return(str);
 
 }
-
+:

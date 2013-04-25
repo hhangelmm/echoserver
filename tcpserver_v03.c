@@ -1,54 +1,183 @@
-/*
- * echo server  服务端 v0.3:阻塞I/O,并发模式：thread
- * */
-#include "escommon.h"
-static void *doit(void *);
-void str_echo(int sockfd);
-struct sockaddr_in servaddr,cliaddr;
-int listenfd,connfd;
-	char buf[MAXLINE];
-int main(void)
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <fcntl.h>
+
+#include <event2/event.h>
+
+#include <assert.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+
+#define MAX_LINE 16384
+
+void do_read(evutil_socket_t fd, short events, void *arg);
+void do_write(evutil_socket_t fd, short events, void *arg);
+
+
+struct fd_state {
+	char buffer[MAX_LINE];
+	size_t buffer_used;
+
+	size_t n_written;
+	size_t write_upto;
+
+	struct event *read_event;
+	struct event *write_event;
+};
+
+struct fd_state * alloc_fd_state(struct event_base *base, evutil_socket_t fd)
 {
-	//	daemon(0,0);
-	socklen_t cliaddr_len;
+	struct fd_state *state = malloc(sizeof(struct fd_state));
+	if (!state)
+		return NULL;
+	state->read_event = event_new(base, fd, EV_READ|EV_PERSIST, do_read, state);
+	if (!state->read_event) {
+		free(state);
+		return NULL;
+	}
+	state->write_event =
+		event_new(base, fd, EV_WRITE|EV_PERSIST, do_write, state);
+
+	if (!state->write_event) {
+		event_free(state->read_event);
+		free(state);
+		return NULL;
+	}
+
+	state->buffer_used = state->n_written = state->write_upto = 0;
+
+	assert(state->write_event);
+	return state;
+}
+
+void free_fd_state(struct fd_state *state)
+{
+	event_free(state->read_event);
+	event_free(state->write_event);
+	free(state);
+}
+
+void do_read(evutil_socket_t fd, short events, void *arg)
+{
+	struct fd_state *state = arg;
+	char buf[1024];
 	int i;
-	pthread_t tid;
-	listenfd = socket(AF_INET,SOCK_STREAM,0);
-	bzero(&servaddr,sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr.sin_port = htons(SERV_PORT);
-	bind(listenfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
-	listen(listenfd,20);
-	printf("Accepting connections...\n");
-	while(1){
-		cliaddr_len = sizeof(cliaddr);
-		if((connfd = accept(listenfd,(struct sockaddr *)&cliaddr,&cliaddr_len))<0){
-			if(errno == EINTR)
-				continue;
-			else{
-				exit(0);
+	ssize_t result;
+	while (1) {
+		assert(state->write_event);
+		result = recv(fd, buf, sizeof(buf), 0);
+		if (result <= 0)
+			break;
+
+		for (i=0; i < result; ++i)  {
+			if (state->buffer_used < sizeof(state->buffer))
+				state->buffer[state->buffer_used++] = buf[i];
+			if (buf[i] == '\n') {
+				assert(state->write_event);
+				event_add(state->write_event, NULL);
+				state->write_upto = state->buffer_used;
 			}
 		}
-		pthread_create(&tid,NULL,&doit,(void*)connfd);
+	}
+
+	if (result == 0) {
+		free_fd_state(state);
+	} else if (result < 0) {
+		if (errno == EAGAIN) // XXXX use evutil macro
+			return;
+		perror("recv");
+		free_fd_state(state);
 	}
 }
-static void* doit(void *arg)
+
+void do_write(evutil_socket_t fd, short events, void *arg)
 {
-	pthread_detach(pthread_self());
-	str_echo((int)arg);
-	close((int)arg);
-	return(NULL);
-}
-void str_echo(int sockfd)
-{
-	int n,num;
-	char str[INET_ADDRSTRLEN];
-	inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
-	while((n = read(connfd,buf,MAXLINE))>0){
-		num++;
-		printf("received from at PORT %d,%d\n",ntohs(cliaddr.sin_port),num);
-		write(connfd,buf,n);
+	struct fd_state *state = arg;
+
+	while (state->n_written < state->write_upto) {
+		ssize_t result = send(fd, state->buffer + state->n_written,
+				state->write_upto - state->n_written, 0);
+		if (result < 0) {
+			if (errno == EAGAIN) // XXX use evutil macro
+				return;
+			free_fd_state(state);
+			return;
+		}
+		assert(result != 0);
+
+		state->n_written += result;
 	}
-	printf("the client has been closed.\n");
+
+	if (state->n_written == state->buffer_used)
+		state->n_written = state->write_upto = state->buffer_used = 1;
+
+	event_del(state->write_event);
 }
+
+void do_accept(evutil_socket_t listener, short event, void *arg)
+{
+	struct event_base *base = arg;
+	struct sockaddr_storage ss;
+	socklen_t slen = sizeof(ss);
+	int fd = accept(listener, (struct sockaddr*)&ss, &slen);
+	if (fd < 0) { // XXXX eagain??
+		perror("accept");
+	} else if (fd > FD_SETSIZE) {
+		close(fd); // XXX replace all closes with EVUTIL_CLOSESOCKET */
+	} else {
+		printf("connected \n ");
+		struct fd_state *state;
+		evutil_make_socket_nonblocking(fd);
+		state = alloc_fd_state(base, fd);
+		assert(state); /*XXX err*/
+		assert(state->write_event);
+		event_add(state->read_event, NULL);
+	}
+}
+
+void run(void)
+{
+	evutil_socket_t listener;
+	struct sockaddr_in sin;
+	struct event_base *base;
+	struct event *listener_event;
+
+	base = event_base_new();
+	if (!base)
+		return; /*XXXerr*/
+
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = htonl(INADDR_ANY);
+	sin.sin_port = htons(8000);
+
+	listener = socket(AF_INET, SOCK_STREAM, 0);
+	evutil_make_socket_nonblocking(listener);
+
+	if (bind(listener, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
+		perror("bind");
+		return;
+	}
+
+	if (listen(listener, 16)<0) {
+		perror("listen");
+		return;
+	}
+
+	listener_event = event_new(base, listener, EV_READ|EV_PERSIST, do_accept, (void*)base);
+	/*XXX check it */
+	event_add(listener_event, NULL);
+
+	event_base_dispatch(base);
+}
+
+int main(int c, char **v)
+{
+	setvbuf(stdout, NULL, _IONBF, 0);
+
+	run();
+	return 0;
+}
+
