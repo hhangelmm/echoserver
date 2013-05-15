@@ -1,5 +1,5 @@
 /*
- * echo server  服务端 v0.1 :阻塞I/O,并发模式：fork()
+ * echo server  服务端 v0.0
  * */
 #include <stdio.h>
 #include <time.h>
