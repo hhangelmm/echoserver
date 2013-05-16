@@ -10,12 +10,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-
+#include <signal.h>
 #define MAX_LINE 16384
 
 void do_read(evutil_socket_t fd, short events, void *arg);
 void do_write(evutil_socket_t fd, short events, void *arg);
 
+struct event_base *base;
 
 struct fd_state {
 	char buffer[MAX_LINE];
@@ -27,6 +28,11 @@ struct fd_state {
 	struct event *read_event;
 	struct event *write_event;
 };
+
+void signalHandler(int sig){
+	event_base_loopbreak(base);
+}
+
 
 struct fd_state * alloc_fd_state(struct event_base *base, evutil_socket_t fd)
 {
@@ -72,7 +78,7 @@ void do_read(evutil_socket_t fd, short events, void *arg)
 		if (result <= 0)
 			break;
 
-		printf("recv sizeof buf: %d\n", result);
+		//printf("recv sizeof buf: %d\n", result);
 		for (i=0; i < result; ++i)  {
 			if (state->buffer_used < sizeof(state->buffer))
 				state->buffer[state->buffer_used++] = buf[i];
@@ -85,12 +91,14 @@ void do_read(evutil_socket_t fd, short events, void *arg)
 	}
 
 	if (result == 0) {
-		free_fd_state(state);
+		//free_fd_state(state);
+		close(fd);
 	} else if (result < 0) {
 		if (errno == EAGAIN) // XXXX use evutil macro
 			return;
 		perror("recv");
 		free_fd_state(state);
+		close(fd);
 	}
 }
 
@@ -100,11 +108,12 @@ void do_write(evutil_socket_t fd, short events, void *arg)
 
 	while (state->n_written < state->write_upto) {
 		ssize_t result = send(fd, state->buffer + state->n_written,	state->write_upto - state->n_written, 0);
-		printf("send sizeof buf: %d\n", result);
+		//printf("send sizeof buf: %d\n", result);
 		if (result < 0) {
 			if (errno == EAGAIN) // XXX use evutil macro
 				return;
 			free_fd_state(state);
+			close(fd);
 			return;
 		}
 		assert(result != 0);
@@ -122,15 +131,13 @@ void do_accept(evutil_socket_t listener, short event, void *arg)
 {
 	struct event_base *base = arg;
 	struct sockaddr_storage ss;
-	socklen_t slen = sizeof(ss);
+	socklen_t slen = sizeof(struct sockaddr);
 	int fd = accept(listener, (struct sockaddr*)&ss, &slen);
 	if (fd < 0) { // XXXX eagain??
 		perror("accept");
-	} else if (fd > FD_SETSIZE) {
-		close(fd); // XXX replace all closes with EVUTIL_CLOSESOCKET */
 	} else {
-		printf("connected \n ");
-		struct fd_state *state;
+	//	printf("connected \n ");
+				struct fd_state *state;
 		evutil_make_socket_nonblocking(fd);
 		state = alloc_fd_state(base, fd);
 		assert(state); /*XXX err*/
@@ -143,7 +150,6 @@ void run(void)
 {
 	evutil_socket_t listener;
 	struct sockaddr_in sin;
-	struct event_base *base;
 	struct event *listener_event;
 
 	base = event_base_new();
@@ -155,6 +161,9 @@ void run(void)
 	sin.sin_port = htons(8000);
 
 	listener = socket(AF_INET, SOCK_STREAM, 0);
+	int nREUSEADDR = 1;
+	setsockopt(listener,SOL_SOCKET,SO_REUSEADDR,(const char*)&nREUSEADDR,sizeof(int));
+
 	evutil_make_socket_nonblocking(listener);
 
 	if (bind(listener, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
@@ -172,12 +181,13 @@ void run(void)
 	event_add(listener_event, NULL);
 
 	event_base_dispatch(base);
+	close(listener);
 }
 
 int main(int c, char **v)
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
-
+signal(SIGINT,signalHandler); 
 	run();
 	return 0;
 }

@@ -1,18 +1,31 @@
 /*
  * echo server  服务端 v0.1 :阻塞I/O,并发模式：fork()
  * */
-#include "escommon.h"
+#include <stdio.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+#define MAXLINE 80
+#define SERV_PORT 8000
+#define LISTENQ 20
+
 int main(void)
 {
 //	daemon(0,0);
-	signal(SIGCLD, SIG_IGN);
+	//signal(SIGCLD, SIG_IGN);
 	struct sockaddr_in servaddr,cliaddr;
 	socklen_t cliaddr_len;
 	int listenfd,connfd;
 	char buf[MAXLINE];
 	char str[INET_ADDRSTRLEN];
-	int i,n,num=0;
-
+	int n,num=0;
+	//int i;
 	listenfd = socket(AF_INET,SOCK_STREAM,0);
 	bzero(&servaddr,sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
@@ -27,15 +40,16 @@ int main(void)
 			if(errno == EINTR)
 				continue;
 			else{
+				perror("accept:");
 			exit(0);
 			}
 		}
-		i = fork();
+		/*i = fork();
 		if(i == -1){
 			printf("fork error");
 			exit(1);
 		}else if(i == 0){
-			close(listenfd);
+			close(listenfd);*/
 			inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
 			while((n = read(connfd,buf,MAXLINE))>0){
 				num++;
@@ -45,9 +59,9 @@ int main(void)
 			printf("the client has been closed.\n");
 			close(connfd);
 			exit(0);
-		}else
+		/*}else
 		{
 			close(connfd);
-		}
+		}*/
 	}
 }

@@ -9,10 +9,11 @@ void str_cli(FILE *fp,int sockfd);
 long int count;
 struct sockaddr_in servaddr;
 
+	int keepalive = 0;
 int main(int argc,char *argv[])
 {
 	char c;
-	int sockfd,count= 0;
+	int count= 0;
 	int starttime,endtime,ttime;
 	float rps;
 	int bingfanum=10;
@@ -20,12 +21,17 @@ int main(int argc,char *argv[])
 	while(-1!=(c = getopt(argc,argv,
 					"h:"
 					"c:"
+					"K"//是否采用长连接
 					))){
 		switch(c){
 			case 'c':
 				bingfanum = atoi(optarg);
+				break;
 			case 'h':
 				inet_pton(AF_INET,optarg,&servaddr.sin_addr);
+				break;
+			case 'K':
+				keepalive = 1;
 				break;
 			default:
 				printf("usage: echoclient -h<serverhost>");
@@ -40,8 +46,7 @@ int main(int argc,char *argv[])
 	pthread_t tid1[bingfanum];
 	starttime = time(NULL);
 	for(i = 0;i<bingfanum;i++){
-		sockfd = socket(AF_INET,SOCK_STREAM,0);
-		if((rtn = pthread_create(&tid1[i],NULL,connectto,(void*)sockfd))){
+		if((rtn = pthread_create(&tid1[i],NULL,connectto,NULL))){
 			printf("strerror: %s ", strerror(errno)); 
 			printf("pthread error %d\n",i);
 			exit(0);
@@ -59,36 +64,52 @@ int main(int argc,char *argv[])
 }
 void *connectto(void* arg)
 {
-	int sockfd = (int)arg;
-	printf("\n%d",sockfd);
-
-	if(connect(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) != 0)
-	{
-		printf("connect error: %s ", strerror(errno));
-		exit(0);
+	int sockfd;
+	if(keepalive){
+		sockfd = socket(AF_INET,SOCK_STREAM,0);
+		if(connect(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) != 0)
+		{
+			printf("connect error: %s ", strerror(errno));
+			exit(0);
+		}
+		str_cli(stdin,sockfd);
+		close(sockfd);
+	}else{
+		int i,m=10000;
+		for(i=0;i<m;i++){
+			sockfd = socket(AF_INET,SOCK_STREAM,0);
+			if(connect(sockfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) != 0)
+			{
+				printf("connect error: %s ", strerror(errno));
+				exit(0);
+			}
+			//printf("connect %d\n",sockfd);
+			str_cli(stdin,sockfd);
+			close(sockfd);
+			//printf("close %d\n",sockfd);
+		}
 	}
-	str_cli(stdin,sockfd);
-	close(sockfd);
 	return(NULL);
 }
 void str_cli(FILE *fp,int sockfd)
 {
-	long int count = 0;
 	int n;
 	char recvline[MAXLINE];
-	int m=100000;
+	int m=1;
+	if(keepalive)
+		m=100000;
 	char *buf = "asdf\n";
 	while((m--)>0){
 		if( (n = write(sockfd,buf,strlen(buf))) < 0){
 			perror("write error\n");
 		}
-		if((n = (read(sockfd,recvline,n)))>0){
-			count++;
+		/*if((n = (read(sockfd,recvline,n)))>0){
 			//write(STDOUT_FILENO,recvline,n);
 		}else
-			perror("read error\n");
+			perror("read error\n");*/
 	}
-	printf("\ncount :%ld %d ",count,sockfd);
+	//printf("write read\n");
+	//printf("\ncount :%ld %d ",count,sockfd);
 	return;
 }
 

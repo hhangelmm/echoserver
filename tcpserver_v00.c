@@ -38,7 +38,7 @@ int main(void)
 				continue;
 			else{
 				perror("accept:");
-			exit(0);
+				exit(0);
 			}
 		}
 		inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
