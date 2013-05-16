@@ -64,10 +64,10 @@ int main(int argc,char **argv)
 			snprintf(buf,sizeof(buf),"connect success %d",sockfd);
 			myprintf(printinfo,buf);
 			str_cli(stdin,sockfd,requestnum);
-			close(sockfd); 
 			totalrequest = requestnum;
 		}else
 			perror("connect:");
+		close(sockfd); 
 	}else{
 		myprintf(printinfo,"short connection:");
 		totalrequest = requestnum;
@@ -78,9 +78,9 @@ int main(int argc,char **argv)
 				snprintf(buf,sizeof(buf),"connect success %d",sockfd);
 				myprintf(printinfo,buf);
 				str_cli(stdin,sockfd,1);
-				close(sockfd);
 			}else
 				perror("connect:");
+			close(sockfd);
 		}
 	}	
 	endtime = time(NULL);
@@ -103,7 +103,7 @@ void str_cli(FILE *fp,int sockfd,int requestnum)
 		{
 			snprintf(buf,sizeof(buf),"read from server %d chars:  %s",n,recvline);
 			myprintf(printinfo,buf);
-			write(STDOUT_FILENO,recvline,n);
+			//write(STDOUT_FILENO,recvline,n);
 		}
 		else
 			perror("read:");
