@@ -67,7 +67,7 @@ int main(int argc,char **argv)
 			totalrequest = requestnum;
 		}else
 			perror("connect:");
-		close(sockfd); 
+		shutdown(sockfd,SHUT_WR); 
 	}else{
 		myprintf(printinfo,"short connection:");
 		totalrequest = requestnum;
@@ -80,7 +80,7 @@ int main(int argc,char **argv)
 				str_cli(stdin,sockfd,1);
 			}else
 				perror("connect:");
-			close(sockfd);
+			shutdown(sockfd,SHUT_WR);
 		}
 	}	
 	endtime = time(NULL);
