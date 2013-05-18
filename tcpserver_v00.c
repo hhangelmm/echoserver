@@ -28,6 +28,8 @@ int main(void)
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(SERV_PORT);
+	int nREUSEADDR = 1;
+	setsockopt(listenfd,SOL_SOCKET,SO_REUSEADDR,(const char*)&nREUSEADDR,sizeof(int));
 	bind(listenfd,(struct sockaddr *)&servaddr,sizeof(servaddr));
 	listen(listenfd,20);
 	printf("Accepting connections...\n");
@@ -44,10 +46,10 @@ int main(void)
 		inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
 		while((n = read(connfd,buf,MAXLINE))>0){
 			num++;
-			printf("received from at PORT %d,%d\n",ntohs(cliaddr.sin_port),num);
+//			printf("received from at PORT %d,%d\n",ntohs(cliaddr.sin_port),num);
 			write(connfd,buf,n);
 		}
-		printf("the client has been closed.\n");
+//		printf("the client has been closed.\n");
 		close(connfd);
 	}
 }

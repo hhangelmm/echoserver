@@ -67,7 +67,7 @@ int main(int argc,char **argv)
 			totalrequest = requestnum;
 		}else
 			perror("connect:");
-		shutdown(sockfd,SHUT_WR); 
+		close(sockfd);
 	}else{
 		myprintf(printinfo,"short connection:");
 		totalrequest = requestnum;
@@ -80,7 +80,7 @@ int main(int argc,char **argv)
 				str_cli(stdin,sockfd,1);
 			}else
 				perror("connect:");
-			shutdown(sockfd,SHUT_WR);
+			close(sockfd);
 		}
 	}	
 	endtime = time(NULL);
@@ -96,9 +96,14 @@ void str_cli(FILE *fp,int sockfd,int requestnum)
 	char sendline[]="asdf\n",recvline[MAXLINE];
 	while(requestnum-->0){
 		n = strlen(sendline);
-		write(sockfd,sendline,n);
-		snprintf(buf,sizeof(buf),"write to server %d chars : %s",n,sendline);
-		myprintf(printinfo,buf);
+		if((n = write(sockfd,sendline,n))>0)
+		{
+			snprintf(buf,sizeof(buf),"write to server %d chars : %s",n,sendline);
+			myprintf(printinfo,buf);
+		}else
+		{
+			perror("write:");
+		}
 		if((n=read(sockfd,recvline,MAXLINE))>0)
 		{
 			snprintf(buf,sizeof(buf),"read from server %d chars:  %s",n,recvline);
