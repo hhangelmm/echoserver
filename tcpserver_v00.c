@@ -44,10 +44,10 @@ int main(void)
 			}
 		}
 		inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
-		while((n = read(connfd,buf,MAXLINE))>0){
+		while((n = recv(connfd,buf,MAXLINE,0))>0){
 			num++;
 //			printf("received from at PORT %d,%d\n",ntohs(cliaddr.sin_port),num);
-			write(connfd,buf,n);
+			send(connfd,buf,n,0);
 		}
 //		printf("the client has been closed.\n");
 		close(connfd);

@@ -96,7 +96,7 @@ void str_cli(FILE *fp,int sockfd,int requestnum)
 	char sendline[]="asdf\n",recvline[MAXLINE];
 	while(requestnum-->0){
 		n = strlen(sendline);
-		if((n = write(sockfd,sendline,n))>0)
+		if((n = send(sockfd,sendline,n,0))>0)
 		{
 			snprintf(buf,sizeof(buf),"write to server %d chars : %s",n,sendline);
 			myprintf(printinfo,buf);
@@ -104,7 +104,7 @@ void str_cli(FILE *fp,int sockfd,int requestnum)
 		{
 			perror("write:");
 		}
-		if((n=read(sockfd,recvline,MAXLINE))>0)
+		if((n=recv(sockfd,recvline,MAXLINE,0))>0)
 		{
 			snprintf(buf,sizeof(buf),"read from server %d chars:  %s",n,recvline);
 			myprintf(printinfo,buf);
