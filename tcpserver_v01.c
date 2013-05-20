@@ -10,21 +10,20 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <signal.h>
 
 #define MAXLINE 80
 #define SERV_PORT 8000
 #define LISTENQ 20
-
+void str_echo(int sockfd);
+struct sockaddr_in servaddr,cliaddr;
+int n,num=0;
 int main(void)
 {
 	//  daemon(0,0);
 	signal(SIGCLD, SIG_IGN);
-	struct sockaddr_in servaddr,cliaddr;
 	socklen_t cliaddr_len;
 	int listenfd,connfd;
-	char buf[MAXLINE];
-	char str[INET_ADDRSTRLEN];
-	int n,num=0;
 	listenfd = socket(AF_INET,SOCK_STREAM,0);
 	bzero(&servaddr,sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
@@ -45,23 +44,38 @@ int main(void)
 				exit(0);
 			}
 		}
-		int i;
-		i = fork();
-		if(i == -1){
-			perror("fork error");
-			exit(1);
-		}else if(i == 0){
-			close(listenfd);
-			inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
-			while((n = recv(connfd,buf,MAXLINE,0))>0){
-				num++;
-//				printf("received from at PORT %d,%d\n",ntohs(cliaddr.sin_port),num);
-				send(connfd,buf,n,0);
-			}
-//			printf("the client has been closed.\n");
-			close(connfd);
-			exit(0);
+		char is_long ;
+		recv(connfd,&is_long,1,0);
+		//		printf("connfd is_long:%c\n",is_long);
+		if(is_long == 'k')
+		{
+			int i;
+			i = fork();
+			if(i == -1){
+				perror("fork error");
+				exit(1);
+			}else if(i == 0){
+				close(listenfd);
+				str_echo(connfd);
+				exit(0);
+			}else
+				close(connfd);
 		}else
-			close(connfd);
+		{
+			str_echo(connfd);
+		}
 	}
 }	
+void str_echo(int connfd)
+{
+	char buf[MAXLINE];
+	char str[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
+	while((n = recv(connfd,buf,MAXLINE,0))>0){
+		num++;
+		//      printf("received from at PORT %d,%d\n",ntohs(cliaddr.sin_port),num);
+		send(connfd,buf,n,0);
+	}
+	//      printf("the client has been closed.\n");
+	close(connfd);
+}
