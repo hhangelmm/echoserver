@@ -1,5 +1,5 @@
 /*
- * echo server  服务端 v0.1
+ * echo server  服务端 v0.1,多进程处理并发
  * */
 #include <stdio.h>
 #include <time.h>

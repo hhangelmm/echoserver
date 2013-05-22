@@ -1,5 +1,5 @@
 /*
- * echo server 客户端 v0.1 :阻塞I/O
+ * echo server 客户端 v0.1 :阻塞I/O,无并发
  * */
 #include <stdio.h>
 #include <string.h>
