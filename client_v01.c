@@ -1,5 +1,5 @@
 /*
- * echo server 客户端 v0.1 :阻塞I/O,无并发
+ * echo server 客户端 v0.1 :阻塞I/O,无并发, 用来测试 tcpserver_v00.c
  * */
 #include <stdio.h>
 #include <string.h>

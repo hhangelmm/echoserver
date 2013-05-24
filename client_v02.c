@@ -1,5 +1,5 @@
 /*
- * echo server 客户端 v0.1 :阻塞I/O
+ * echo server 客户端 v0.1 :阻塞I/O,用fork并发发起连接，可以用来测试tcpserver_v01.c, tcpserver_v02.c
  * */
 #include <stdio.h>
 #include <string.h>

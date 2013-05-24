@@ -1,5 +1,5 @@
 /*
- * echo server  服务端 v0.0
+ * echo server  服务端 v0.0,迭代服务器，不能处理并发
  * */
 #include <stdio.h>
 #include <time.h>

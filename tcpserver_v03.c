@@ -1,194 +1,102 @@
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <fcntl.h>
-
-#include <event2/event.h>
-
-#include <assert.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
+/*
+ *echo server 服务端 v0.3 :select ,非阻塞I/O 
+ */
 #include <stdio.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
 #include <errno.h>
-#include <signal.h>
-#define MAX_LINE 16384
-
-void do_read(evutil_socket_t fd, short events, void *arg);
-void do_write(evutil_socket_t fd, short events, void *arg);
-
-struct event_base *base;
-
-struct fd_state {
-	char buffer[MAX_LINE];
-	size_t buffer_used;
-
-	size_t n_written;
-	size_t write_upto;
-
-	struct event *read_event;
-	struct event *write_event;
-};
-
-void signalHandler(int sig){
-	event_base_loopbreak(base);
-}
-
-
-struct fd_state * alloc_fd_state(struct event_base *base, evutil_socket_t fd)
+#include <stdlib.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#define MAXLINE 80
+#define SERV_PORT 8000
+#define LISTENQ 20
+void str_echo(int sockfd);
+struct sockaddr_in cliaddr,servaddr;
+int set_nonblocking(int fd);
+fd_set rset,allset;
+int main(int argc,char **argv)
 {
-	struct fd_state *state = malloc(sizeof(struct fd_state));
-	if (!state)
-		return NULL;
-	state->read_event = event_new(base, fd, EV_READ|EV_PERSIST, do_read, state);
-	if (!state->read_event) {
-		free(state);
-		return NULL;
+	int i,maxfd,listenfd,connfd;
+	int nready;
+	socklen_t clilen;
+	char str[INET_ADDRSTRLEN];
+	if((listenfd = socket(AF_INET,SOCK_STREAM,0)) == -1){
+		perror("socket");
+		exit(0);
 	}
-	state->write_event =
-		event_new(base, fd, EV_WRITE|EV_PERSIST, do_write, state);
-
-	if (!state->write_event) {
-		event_free(state->read_event);
-		free(state);
-		return NULL;
+	bzero(&servaddr,sizeof(servaddr));
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	servaddr.sin_port = htons(SERV_PORT);
+	int nREUSEADDR = 1;
+	setsockopt(listenfd,SOL_SOCKET,SO_REUSEADDR,(const char*)&nREUSEADDR,sizeof(int));
+	if(bind(listenfd,(struct sockaddr *)&servaddr,sizeof(servaddr)) == -1){
+		perror("bind");
+		exit(0);
 	}
+	listen(listenfd,LISTENQ);
+	//	printf("Accepting connections...\n");
+	maxfd = FD_SETSIZE;
 
-	state->buffer_used = state->n_written = state->write_upto = 0;
+	FD_ZERO(&allset);
+	FD_SET(listenfd,&allset);
+	for(;;){
+		rset = allset;
+		nready = select(maxfd,&rset,NULL,NULL,NULL);
+		if(nready <0){
+			perror("select");
+			continue;
+		}
+		for(i=0;i<=maxfd;i++){
+			if(FD_ISSET(i,&rset)){
+				if(i != listenfd){
+					str_echo(i);
+				}else
+				{
+					clilen = sizeof(cliaddr);
+					if((connfd = accept(listenfd,(struct sockaddr *)&cliaddr,&clilen))<0)
+					{
+						perror("accept");
+						continue;
+					}
 
-	assert(state->write_event);
-	return state;
-}
-
-void free_fd_state(struct fd_state *state)
-{
-	event_free(state->read_event);
-	event_free(state->write_event);
-	free(state);
-}
-
-void do_read(evutil_socket_t fd, short events, void *arg)
-{
-	struct fd_state *state = arg;
-	char buf[1024];
-	int i;
-	ssize_t result;
-	while (1) {
-		assert(state->write_event);
-		result = recv(fd, buf, sizeof(buf), 0);
-		if (result <= 0)
-			break;
-
-		//printf("recv sizeof buf: %d\n", result);
-		for (i=0; i < result; ++i)  {
-			if (state->buffer_used < sizeof(state->buffer))
-				state->buffer[state->buffer_used++] = buf[i];
-			if (buf[i] == '\n') {
-				assert(state->write_event);
-				event_add(state->write_event, NULL);
-				state->write_upto = state->buffer_used;
+					inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
+					//			printf("connected from xxx  at  PORT %d,fd:%d\n",ntohs(cliaddr.sin_port),connfd);
+					set_nonblocking(connfd);
+					FD_SET(connfd,&allset);
+				}
 			}
 		}
 	}
-
-	if (result == 0) {
-		//free_fd_state(state);
-		close(fd);
-	} else if (result < 0) {
-		if (errno == EAGAIN) // XXXX use evutil macro
-			return;
-		perror("recv");
-		free_fd_state(state);
-		close(fd);
-	}
 }
-
-void do_write(evutil_socket_t fd, short events, void *arg)
+void str_echo(int connfd)
 {
-	struct fd_state *state = arg;
+	char buf[MAXLINE];
+	char str[INET_ADDRSTRLEN];
+	ssize_t n;
+	inet_ntop(AF_INET, &cliaddr.sin_addr, str,sizeof(str));
+		if((n = recv(connfd,buf,MAXLINE,0))>0){
+			if(send(connfd,buf,n,0) <= 0)
+				perror("write:");
+		}else if (n==0){
+			FD_CLR(connfd,&allset);
+			close(connfd);
+		}else if(n == EWOULDBLOCK){
 
-	while (state->n_written < state->write_upto) {
-		ssize_t result = send(fd, state->buffer + state->n_written,	state->write_upto - state->n_written, 0);
-		//printf("send sizeof buf: %d\n", result);
-		if (result < 0) {
-			if (errno == EAGAIN) // XXX use evutil macro
-				return;
-			free_fd_state(state);
-			close(fd);
-			return;
+		}else{
+			perror("recv");
+			FD_CLR(connfd,&allset);
+			close(connfd);
 		}
-		assert(result != 0);
-
-		state->n_written += result;
-	}
-
-	if (state->n_written == state->buffer_used)
-		state->n_written = state->write_upto = state->buffer_used = 1;
-
-	event_del(state->write_event);
 }
-
-void do_accept(evutil_socket_t listener, short event, void *arg)
+int set_nonblocking(int fd)
 {
-	struct event_base *base = arg;
-	struct sockaddr_storage ss;
-	socklen_t slen = sizeof(struct sockaddr);
-	int fd = accept(listener, (struct sockaddr*)&ss, &slen);
-	if (fd < 0) { // XXXX eagain??
-		perror("accept");
-	} else {
-	//	printf("connected \n ");
-				struct fd_state *state;
-		evutil_make_socket_nonblocking(fd);
-		state = alloc_fd_state(base, fd);
-		assert(state); /*XXX err*/
-		assert(state->write_event);
-		event_add(state->read_event, NULL);
-	}
+	int flags;
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
+		flags = 0;
+	return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
-
-void run(void)
-{
-	evutil_socket_t listener;
-	struct sockaddr_in sin;
-	struct event *listener_event;
-
-	base = event_base_new();
-	if (!base)
-		return; /*XXXerr*/
-
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = htonl(INADDR_ANY);
-	sin.sin_port = htons(8000);
-
-	listener = socket(AF_INET, SOCK_STREAM, 0);
-	int nREUSEADDR = 1;
-	setsockopt(listener,SOL_SOCKET,SO_REUSEADDR,(const char*)&nREUSEADDR,sizeof(int));
-
-	evutil_make_socket_nonblocking(listener);
-
-	if (bind(listener, (struct sockaddr*)&sin, sizeof(sin)) < 0) {
-		perror("bind");
-		return;
-	}
-
-	if (listen(listener, 16)<0) {
-		perror("listen");
-		return;
-	}
-
-	listener_event = event_new(base, listener, EV_READ|EV_PERSIST, do_accept, (void*)base);
-	/*XXX check it */
-	event_add(listener_event, NULL);
-
-	event_base_dispatch(base);
-	close(listener);
-}
-
-int main(int c, char **v)
-{
-	setvbuf(stdout, NULL, _IONBF, 0);
-signal(SIGINT,signalHandler); 
-	run();
-	return 0;
-}
-
