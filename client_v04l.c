@@ -19,7 +19,7 @@ void do_read(evutil_socket_t fd, short events, void *arg);
 void do_write(evutil_socket_t fd, short events, void *arg);
 void do_connect(evutil_socket_t sockfd, short event, void *arg);
 struct event_base *base;
-	struct event *sockfd_event;
+struct event *sockfd_event;
 int count=0;
 int starttime,endtime,ttime;
 struct sockaddr_in servaddr;
@@ -54,14 +54,12 @@ struct fd_state * alloc_fd_state(struct event_base *base, evutil_socket_t fd)
 	struct fd_state *state = malloc(sizeof(struct fd_state));
 	if (!state)
 		return NULL;
-	state->read_event = event_new(base, fd, EV_READ|EV_PERSIST, do_read, state);
+		state->read_event = event_new(base, fd, EV_READ|EV_PERSIST, do_read, state);//长连接时
 	if (!state->read_event) {
 		free(state);
 		return NULL;
 	}
-	state->write_event =
-		event_new(base, fd, EV_WRITE|EV_PERSIST, do_write, state);
-
+		state->write_event =event_new(base, fd, EV_WRITE|EV_PERSIST, do_write, state);//长连接时
 	if (!state->write_event) {
 		event_free(state->read_event);
 		free(state);
@@ -91,11 +89,9 @@ void do_write(evutil_socket_t fd, short events, void *arg)
 	if (result <= 0)
 		perror("send:");
 	assert(state->read_event);
-	printf("write buf size:%d : %s\n",result,buf);
+//	printf("write buf size:%d : %s\n",result,buf);
 	count++;
-	//event_add(state->read_event, NULL);
-	event_del(state->write_event);
-//	close(fd);
+	event_add(state->read_event, NULL);
 	return;	
 }
 
@@ -111,12 +107,8 @@ void do_read(evutil_socket_t fd, short events, void *arg)
 		return;
 	}
 	assert(result != 0);
-	//	printf("read buf size:%d: %s\n",result,buf);
-	//	close(fd);
+//	printf("read buf size:%d: %s\n",result,buf);
 	//	write(STDOUT_FILENO, buf, result);
-	//	event_del(state->read_event);
-	/*if(result==0)
-	  close(fd);*/
 	return;
 }
 int max(int a, int b)
@@ -134,7 +126,7 @@ void do_connect(evutil_socket_t sockfd, short event, void *arg)
 	if (fd < 0 && (errno != EINPROGRESS)) { // XXXX eagain??
 		perror("connect");
 	} else {
-		printf("connect %d:\n",sockfd);
+//		printf("connect %d:\n",sockfd);
 		struct fd_state *state;
 		evutil_make_socket_nonblocking(sockfd);
 		state = alloc_fd_state(base, sockfd);
@@ -185,7 +177,7 @@ void run(int c, char **v)
 		if(sockfd[i]==-1)
 			perror("socket");
 		evutil_make_socket_nonblocking(sockfd[i]);
-		sockfd_event = event_new(base, sockfd[i], EV_READ|EV_PERSIST, do_connect,(void *)&cs);
+		sockfd_event = event_new(base, sockfd[i], EV_READ, do_connect,(void *)&cs);//长连接时
 		event_add(sockfd_event, NULL);
 	}
 

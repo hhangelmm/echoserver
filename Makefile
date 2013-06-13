@@ -1,7 +1,7 @@
 all: echoserver echoclient
 echoserver:tcpserver_v04.c 
 	gcc -Wall -pg -g  -o echoserver tcpserver_v04.c  
-echoclient:client_v03.c    
-	gcc -Wall -g -o echoclient client_v03.c  -lpthread
+echoclient:client_v04l.c    
+	gcc -Wall -g -o echoclient client_v04l.c  -levent
 clean:
 	rm echoserver echoclient
