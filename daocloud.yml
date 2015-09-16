@@ -6,7 +6,7 @@ env:
 
 
 install:
-    cd /usr/local/echoserver && make
+    - cd /usr/local/echoserver && make
 before_script:
 
 script:
