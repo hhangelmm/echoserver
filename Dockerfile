@@ -12,4 +12,4 @@ RUN git clone https://github.com/snowcrystall/echoserver.git /usr/local/echoserv
 RUN cd /usr/local/echoserver \
     && make 
 EXPOSE 8000
-RUN /usr/local/echoserver/echoserver &
+CMD     ["/usr/local/echoserver/echoserver", ""]
