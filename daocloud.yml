@@ -10,4 +10,4 @@ install:
 before_script:
 
 script:
-    
+    - ls /usr/local/echoserver
