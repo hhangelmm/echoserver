@@ -11,4 +11,5 @@ RUN apt-get update && apt-get install -y \
 RUN git clone https://github.com/snowcrystall/echoserver.git /usr/local/echoserver
 RUN cd /usr/local/echoserver \
     && make 
+EXPOSE 8000
 RUN /usr/local/echoserver/echoserver &
