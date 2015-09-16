@@ -1,0 +1,13 @@
+image: daocloud/ci-gcc:5
+
+services:
+
+env:
+
+
+install:
+    cd /usr/local/echoserver && make
+before_script:
+
+script:
+    
